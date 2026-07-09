@@ -40,15 +40,18 @@ def calculate_latency(results):
                 data.append(time_taken)
             else:
                 failed.append(result)
-    print(f"data len: {len(data)}, num failed: {len(failed)}, num exceptions{len(exceptions)}")
-    p25 = np.percentile(data,25)
-    p50 = np.percentile(data,50)
-    p75 = np.percentile(data,75)
-    p95 = np.percentile(data,95)
-    
+    #print(f"data len: {len(data)}, num failed: {len(failed)}, num exceptions{len(exceptions)}")
+    if len(data) > 0:
+        p25 = np.percentile(data,25)
+        p50 = np.percentile(data,50)
+        p75 = np.percentile(data,75)
+        p95 = np.percentile(data,95)
+    else:
+        p25 = p50 = p75 = p95 = -1
+
     return [p25,p50,p75,p95, failed, exceptions]
 
-def look_bttr(lst: [p25,p50,p75,p90,failed, exceptions], connections):
+def look_bttr(lst: "[p25,p50,p75,p90,failed, exceptions]", connections):
     print(f"""At {connections} connectsions the latency at \n 
     p25 = {lst[0]} \n
     p50 = {lst[1]} \n
@@ -58,5 +61,5 @@ def look_bttr(lst: [p25,p50,p75,p90,failed, exceptions], connections):
     exceptions: {lst[5]}\n """)
 
 if __name__ == "__main__":
-    asyncio.run(test_latency(10))
-    asyncio.run(test_latency(100))
+    for num_connections in [10,100,200,300,500,700, 900, 1000,1200]:
+        asyncio.run(test_latency(num_connections))
