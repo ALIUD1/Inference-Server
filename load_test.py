@@ -11,21 +11,17 @@ url = "http://127.0.0.1:8001/"
 
 async def concurrent(url, file,client):
     start = time.perf_counter()
-    response = await client.post(url,files = files)
+    response = await client.post(url,files = file)
     end = time.perf_counter()
     return (start,end, response.status_code)
 
-async def test_latency(connections):
-    limits = httpx.Limits(
-        max_connections = 1000,
-    )
-    async with httpx.AsyncClient(limits = limits) as client:
-        calls = [concurrent(url,img,client) for i in range(connections)]
+async def test_latency(connections,client):
+    calls = [concurrent(url,files,client) for i in range(connections)]
 
-        results = await asyncio.gather(*calls, return_exceptions = True)
-        latency_data = calculate_latency(results)
-        #print(f"{latency_data} \n")
-        look_bttr(latency_data,connections)
+    results = await asyncio.gather(*calls, return_exceptions = True)
+    latency_data = calculate_latency(results)
+    #print(f"{latency_data} \n")
+    look_bttr(latency_data,connections)
 
 def calculate_latency(results):
     failed = []
@@ -60,16 +56,19 @@ def look_bttr(lst: "[p25,p50,p75,p90,failed, exceptions]", connections):
     failures: {lst[4]}\n
     exceptions: {lst[5]}\n """)
 
-async def warmup_requests(connections):
+async def warmup_requests(connections,client):
+    calls = [concurrent(url,files,client) for i in range(connections)]
+
+    results = await asyncio.gather(*calls, return_exceptions = True)
+    print(f"Warmup finished running {connections} connections")
+
+async def run_latency_test(tests):
     limits = httpx.Limits(
         max_connections = 1000,
     )
     async with httpx.AsyncClient(limits = limits) as client:
-        calls = [concurrent(url,img,client) for i in range(connections)]
-
-        results = await asyncio.gather(*calls, return_exceptions = True)
-    print(f"Warmup finished running {connections} connections")
+        await warmup_requests(5,client)
+        for num_connections in tests:
+            await test_latency(num_connections,client)
 if __name__ == "__main__":
-    asyncio.run(warmup_requests(5))
-    for num_connections in [10,100,200,300,500,700, 900, 1000,1200]:
-        asyncio.run(test_latency(num_connections))
+    asyncio.run(run_latency_test([10,100,200,300,500,700, 900, 1000,1200]))
