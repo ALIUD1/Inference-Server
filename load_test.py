@@ -60,6 +60,16 @@ def look_bttr(lst: "[p25,p50,p75,p90,failed, exceptions]", connections):
     failures: {lst[4]}\n
     exceptions: {lst[5]}\n """)
 
+async def warmup_requests(connections):
+    limits = httpx.Limits(
+        max_connections = 1000,
+    )
+    async with httpx.AsyncClient(limits = limits) as client:
+        calls = [concurrent(url,img,client) for i in range(connections)]
+
+        results = await asyncio.gather(*calls, return_exceptions = True)
+    print(f"Warmup finished running {connections} connections")
 if __name__ == "__main__":
+    asyncio.run(warmup_requests(5))
     for num_connections in [10,100,200,300,500,700, 900, 1000,1200]:
         asyncio.run(test_latency(num_connections))
