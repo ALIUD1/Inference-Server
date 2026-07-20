@@ -4,7 +4,9 @@ import torch
 from torchvision import models
 from PIL import Image
 import io
+import time
 
+print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
 resnet18 = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
 preprocess = models.ResNet18_Weights.DEFAULT.transforms()
@@ -28,11 +30,15 @@ app = FastAPI()
 
 @app.post("/")
 async def predict_img(file: UploadFile):
+    start = time.perf_counter()
     content = await file.read()
     img = io.BytesIO(content)
-
-    
-    return {"Category Number": test_resnet(resnet18, img)}
+    category_num = test_resnet(resnet18, img)
+    end = time.perf_counter()
+    return {
+        "Category_Number": category_num,
+        "Server_Rate": end - start,
+            }
 
 
 if __name__ == "__main__":

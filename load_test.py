@@ -10,12 +10,16 @@ files = {'file': ("pgiff.webp",img, "img/webp")}
 url = "http://127.0.0.1:8001/"
 
 async def concurrent(url, file,client):
-    start = time.perf_counter()
+    #print("now in concurrent")
+    client_start = time.perf_counter()
     response = await client.post(url,files = file)
-    end = time.perf_counter()
-    return (start,end, response.status_code)
+    client_end = time.perf_counter()
+    if response.status_code != 200:
+        return (client_start,client_end, response.status_code,-1)
+    return (client_start,client_end, response.status_code,response.json()["Server_Rate"])
 
 async def test_latency(connections,client):
+    #print("im in teest_latency")
     calls = [concurrent(url,files,client) for i in range(connections)]
 
     results = await asyncio.gather(*calls, return_exceptions = True)
@@ -24,37 +28,48 @@ async def test_latency(connections,client):
     look_bttr(latency_data,connections)
 
 def calculate_latency(results):
+    #print("Now in calculate latency")
+    """
+    results is a list with the following data
+    0: Client Start time
+    1: Client End time
+    2: Response Status Code
+    4: Server time
+    """
     failed = []
     exceptions = []
-    data = []
+    client_time_data = []
+    server_time_data = []
     for result in results:
         if isinstance(result, Exception):
             exceptions.append(result)
         else:
             if result[2] == 200:
                 time_taken = result[1] - result[0]
-                data.append(time_taken)
+                client_time_data.append(time_taken)
+                server_time_data.append(result[3])
             else:
                 failed.append(result)
     #print(f"data len: {len(data)}, num failed: {len(failed)}, num exceptions{len(exceptions)}")
-    if len(data) > 0:
-        p25 = np.percentile(data,25)
-        p50 = np.percentile(data,50)
-        p75 = np.percentile(data,75)
-        p95 = np.percentile(data,95)
+    client_time_percentiles = {}
+    server_time_percentiles = {}
+    if len(server_time_data) > 0 and len(client_time_data) > 0:
+        for percent in [25,50,75,95]:
+            server_time_percentiles[f"p{percent}"] = np.percentile(server_time_data, percent)
+            client_time_percentiles[f"p{percent}"] = np.percentile(client_time_data, percent)
     else:
-        p25 = p50 = p75 = p95 = -1
+        for percent in [25,50,75,95]:
+            server_time_percentiles[f"p{percent}"] = -1
+            client_time_percentiles[f"p{percent}"] = -1
+    return [client_time_percentiles, failed, exceptions, server_time_percentiles]
 
-    return [p25,p50,p75,p95, failed, exceptions]
-
-def look_bttr(lst: "[p25,p50,p75,p90,failed, exceptions]", connections):
-    print(f"""At {connections} connectsions the latency at \n 
-    p25 = {lst[0]} \n
-    p50 = {lst[1]} \n
-    p75 = {lst[2]} \n
-    p95 = {lst[3]} \n
-    failures: {lst[4]}\n
-    exceptions: {lst[5]}\n """)
+def look_bttr(latency_data: "[p25,p50,p75,p90,failed, exceptions]", connections):
+    #print("now in look better")
+    print(f"At {connections} connectsions the latency at \n")
+    for (client_key,client_value) , (server_key, server_value) in zip(latency_data[0].items(), latency_data[3].items()):
+        print(f"Client_time: {client_key} = {client_value} \t Server_time: {server_key} = {server_value} \t Time Difference = {client_value - server_value}")
+    print(f"failures: {latency_data[1]}\n")
+    print(f"exceptions: {latency_data[2]}\n")
 
 async def warmup_requests(connections,client):
     calls = [concurrent(url,files,client) for i in range(connections)]
