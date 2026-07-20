@@ -26,6 +26,22 @@ def test_resnet(resnet18, full_image):
     return predicted
 #img.show()
 
+def test_batching(resnet18, full_image):
+    img = Image.open(full_image).convert("RGB")
+    img_tensor = preprocess(img)
+    warmup = resnet18(img_tensor.unsqueeze(0))
+    for i in [1,2,4,8,16,32]:
+        full_tensor = torch.stack([img_tensor]*i)
+        print(full_tensor.shape)
+        with torch.no_grad():
+            diff = float('inf')
+            for perf_counter in range(10):
+                start = time.perf_counter() 
+                predictions = resnet18(full_tensor)
+                end = time.perf_counter()
+                diff = min(end-start,diff)
+            print(f"Time taken for batch {i} = {diff}, time taken for each image = {(diff)/i} \n")
+
 app = FastAPI()
 
 @app.post("/")
@@ -44,3 +60,4 @@ async def predict_img(file: UploadFile):
 if __name__ == "__main__":
     #test_resnet(resnet18)
     print("hello world")
+    test_batching(resnet18,"pgiff.webp")
