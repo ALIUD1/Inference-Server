@@ -12,6 +12,38 @@ resnet18 = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
 preprocess = models.ResNet18_Weights.DEFAULT.transforms()
 resnet18.eval()
 
+pending_jobs = {} 
+
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    reader = asyncio.create_task(response_reader())
+    yield
+    
+
+app = FastAPI(lifespan = lifespan)
+
+@app.post("/")
+async def predict_img(file: UploadFile):
+    start = time.perf_counter()
+    content = await file.read()
+    img = io.BytesIO(content)
+    category_num = test_resnet(resnet18, img)
+    end = time.perf_counter()
+    return {
+        "Category_Number": category_num,
+        "Server_Rate": end - start,
+            }
+
+
+if __name__ == "__main__":
+    #test_resnet(resnet18)
+    print("hello world")
+    test_batching(resnet18,"pgiff.webp")
+
+
+"""
 
 #opens petergriffin image, turns into tensor, gives extra dimension since resnet18 needs 4 and then runs model and predicted number 652 (military uniform)
 def test_resnet(resnet18, full_image):
@@ -42,22 +74,4 @@ def test_batching(resnet18, full_image):
                 diff = min(end-start,diff)
             print(f"Time taken for batch {i} = {diff}, time taken for each image = {(diff)/i} \n")
 
-app = FastAPI()
-
-@app.post("/")
-async def predict_img(file: UploadFile):
-    start = time.perf_counter()
-    content = await file.read()
-    img = io.BytesIO(content)
-    category_num = test_resnet(resnet18, img)
-    end = time.perf_counter()
-    return {
-        "Category_Number": category_num,
-        "Server_Rate": end - start,
-            }
-
-
-if __name__ == "__main__":
-    #test_resnet(resnet18)
-    print("hello world")
-    test_batching(resnet18,"pgiff.webp")
+""""
