@@ -5,6 +5,7 @@ from torchvision import models
 from PIL import Image
 import io
 import time
+from redis.asyncio
 
 print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
@@ -14,12 +15,58 @@ resnet18.eval()
 
 pending_jobs = {} 
 
+#redis functions 
+r = Redis(host = 'localhost', port = 6379, db = 0)
 
+def add_to_queue(job_id, image_bytes):
+    r.set(job_id, image_bytes)
+    r.rpush("jobs", job_id)
+
+async def response_reader():
+    while True:
+       _, response = await r.blpop("response")
+        id, val = struct.unpack("<16sq",response)
+        try:  
+            awake_coroutine(id, val)
+        except Exception as e:
+            print(f"Exception in response reader" {e})
+
+async def store_coroutine(job_id, image_bytes):
+    future = asyncio.get_running_loop().create_future()
+    pending_jobs[job_id] = future
+    add_to_queue(job_id, image_bytes)
+    return await future
+
+async def awake_coroutine(job_id, response):
+    try:
+        future = pending_jobs.pop(job_id)
+        future.set_result(value)
+    except Exception as e:
+        print(f"Exption in awake_coroutine: {e}")
+
+def test_resnet(resnet18, full_image):
+    img = Image.open(full_image).convert("RGB")
+    img_tensor = preprocess(img)
+    img_tensor = img_tensor.unsqueeze(0)
+    print(img_tensor.shape)
+    with torch.no_grad():
+        predictions = resnet18(img_tensor)
+
+    predicted = prediction
+    return predicted
+
+async def concurrent(url, file, client):
+    client_start = time.perf_counter()
+    job_id = uuid.uuid4()
+    job_id = job_id.bytes()
+    response = await store_coroutine(job_id)
+    add_to_queue(job_id,file)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     reader = asyncio.create_task(response_reader())
     yield
+    reader.cancel()
     
 
 app = FastAPI(lifespan = lifespan)
@@ -28,11 +75,12 @@ app = FastAPI(lifespan = lifespan)
 async def predict_img(file: UploadFile):
     start = time.perf_counter()
     content = await file.read()
-    img = io.BytesIO(content)
-    category_num = test_resnet(resnet18, img)
+    job_id = uuid.uuid4()
+    job_id = job_id.bytes
+    response = await store_coroutine(job_id, content)
     end = time.perf_counter()
     return {
-        "Category_Number": category_num,
+        "Category_Number": response,
         "Server_Rate": end - start,
             }
 
