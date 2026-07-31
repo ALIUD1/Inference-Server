@@ -5,7 +5,12 @@ from torchvision import models
 from PIL import Image
 import io
 import time
-from redis.asyncio
+from redis.asyncio import Redis
+import asyncio
+import struct
+import uuid
+from contextlib import asynccontextmanager
+
 
 print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
@@ -18,32 +23,32 @@ pending_jobs = {}
 #redis functions 
 r = Redis(host = 'localhost', port = 6379, db = 0)
 
-def add_to_queue(job_id, image_bytes):
-    r.set(job_id, image_bytes)
-    r.rpush("jobs", job_id)
+async def add_to_queue(job_id, image_bytes):
+    await r.set(job_id, image_bytes)
+    await r.rpush("jobs", job_id)
 
 async def response_reader():
     while True:
-       _, response = await r.blpop("response")
+        _, response = await r.blpop("response")
         id, val = struct.unpack("<16sq",response)
         try:  
             awake_coroutine(id, val)
         except Exception as e:
-            print(f"Exception in response reader" {e})
+            print(f"Exception in response reader{e}" )
 
 async def store_coroutine(job_id, image_bytes):
     future = asyncio.get_running_loop().create_future()
     pending_jobs[job_id] = future
-    add_to_queue(job_id, image_bytes)
+    await add_to_queue(job_id, image_bytes)
     return await future
 
-async def awake_coroutine(job_id, response):
+def awake_coroutine(job_id, response):
     try:
         future = pending_jobs.pop(job_id)
-        future.set_result(value)
+        future.set_result(response)
     except Exception as e:
         print(f"Exption in awake_coroutine: {e}")
-
+"""
 def test_resnet(resnet18, full_image):
     img = Image.open(full_image).convert("RGB")
     img_tensor = preprocess(img)
@@ -61,6 +66,7 @@ async def concurrent(url, file, client):
     job_id = job_id.bytes()
     response = await store_coroutine(job_id)
     add_to_queue(job_id,file)
+"""
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -122,4 +128,4 @@ def test_batching(resnet18, full_image):
                 diff = min(end-start,diff)
             print(f"Time taken for batch {i} = {diff}, time taken for each image = {(diff)/i} \n")
 
-""""
+"""

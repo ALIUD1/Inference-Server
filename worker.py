@@ -1,8 +1,10 @@
-import Redis
+import redis
 import struct
 import uuid
 from PIL import Image
 import io
+import torch
+from torchvision import models
 
 print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
@@ -16,7 +18,7 @@ r = redis.Redis(host = 'localhost', port = 6379, db = 0)
 
 def pop_from_queue():
     while True:
-        payload = r.blpop("jobs", timeout = 1)[1]
+        payload = r.blpop("jobs", timeout = 1)
         if payload is None:
             continue
         job_id = payload[1]
@@ -31,10 +33,11 @@ def push_response_to_queue(id, val):
 
 #worker functions
 def work(model, image_bytes,job_id):
-    img = io.BytesIO(content)
+    img = io.BytesIO(image_bytes)
+    img = Image.open(img).convert("RGB")
     img_tensor = preprocess(img)
     img_tensor = img_tensor.unsqueeze(0)
-    print(img_tensor.shape)
+    #print(img_tensor.shape)
     with torch.no_grad():
         predictions = resnet18(img_tensor)
 
@@ -43,9 +46,5 @@ def work(model, image_bytes,job_id):
 
 
 if __name__ == "__main__":
-    print(r.ping())
-    add_to_queue(b"hello world")
+    pop_from_queue()
 
-
-def get_job():
-    while True:
