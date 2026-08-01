@@ -21,7 +21,8 @@ resnet18.eval()
 pending_jobs = {} 
 
 #redis functions 
-r = Redis(host = 'localhost', port = 6379, db = 0)
+r = Redis(host = 'localhost', port = 6379, db = 0, max_connections = 1000)
+r_reader = Redis(host = 'localhost', port = 6379, db = 0)
 
 async def add_to_queue(job_id, image_bytes):
     await r.set(job_id, image_bytes)
@@ -29,12 +30,12 @@ async def add_to_queue(job_id, image_bytes):
 
 async def response_reader():
     while True:
-        _, response = await r.blpop("response")
+        _, response = await r_reader.blpop("response")
         id, val = struct.unpack("<16sq",response)
         try:  
             awake_coroutine(id, val)
         except Exception as e:
-            print(f"Exception in response reader{e}" )
+            print(f"Exception in response reader{e.type} : {e}" )
 
 async def store_coroutine(job_id, image_bytes):
     future = asyncio.get_running_loop().create_future()
@@ -70,6 +71,7 @@ async def concurrent(url, file, client):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await r.flushdb()
     reader = asyncio.create_task(response_reader())
     yield
     reader.cancel()
