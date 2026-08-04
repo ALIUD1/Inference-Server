@@ -11,7 +11,8 @@ print("model loaded")
 resnet18 = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
 preprocess = models.ResNet18_Weights.DEFAULT.transforms()
 resnet18.eval()
-
+torch.set_num_threads(1)
+print(torch.get_num_threads())
 #redis functions
 
 r = redis.Redis(host = 'localhost', port = 6379, db = 0)

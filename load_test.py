@@ -3,6 +3,12 @@ import asyncio
 #import datetime
 import time
 import numpy as np
+import redis
+
+r = redis.Redis(host='localhost', port=6379, db=0)
+
+# Flush current database
+r.flushdb()
 
 with open("pgiff.webp", "rb") as f:
     img = f.read()
