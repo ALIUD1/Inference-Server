@@ -27,13 +27,14 @@ async def concurrent(url, file,client):
 async def test_latency(connections,client):
     #print("im in teest_latency")
     calls = [concurrent(url,files,client) for i in range(connections)]
-
+    wall_start_time = time.perf_counter()
     results = await asyncio.gather(*calls, return_exceptions = True)
-    latency_data = calculate_latency(results)
+    wall_end_time = time.perf_counter()
+    latency_data = calculate_latency(results,wall_end_time - wall_start_time)
     #print(f"{latency_data} \n")
     look_bttr(latency_data,connections)
 
-def calculate_latency(results):
+def calculate_latency(results, wall_time):
     #print("Now in calculate latency")
     """
     results is a list with the following data
@@ -41,16 +42,19 @@ def calculate_latency(results):
     1: Client End time
     2: Response Status Code
     4: Server time
+    5: Wall Time
     """
     failed = []
     exceptions = []
     client_time_data = []
     server_time_data = []
+    sucessful = 0
     for result in results:
         if isinstance(result, Exception):
             exceptions.append(result)
         else:
             if result[2] == 200:
+                sucessful += 1
                 time_taken = result[1] - result[0]
                 client_time_data.append(time_taken)
                 server_time_data.append(result[3])
@@ -67,13 +71,15 @@ def calculate_latency(results):
         for percent in [25,50,75,95]:
             server_time_percentiles[f"p{percent}"] = -1
             client_time_percentiles[f"p{percent}"] = -1
-    return [client_time_percentiles, failed, exceptions, server_time_percentiles]
+    throughput = sucessful / wall_time
+    return [client_time_percentiles, failed, exceptions, server_time_percentiles, wall_time, sucessful, throughput]
 
-def look_bttr(latency_data: "[p25,p50,p75,p90,failed, exceptions]", connections):
+def look_bttr(latency_data, connections):
     #print("now in look better")
     print(f"At {connections} connectsions the latency at \n")
     for (client_key,client_value) , (server_key, server_value) in zip(latency_data[0].items(), latency_data[3].items()):
         print(f"Client_time: {client_key} = {client_value} \t Server_time: {server_key} = {server_value} \t Time Difference = {client_value - server_value}")
+    print(f"Wall time: {latency_data[4]} \t Sucessful requests: {latency_data[5]} \t Throughput: {latency_data[6]}")
     print(f"failures: {latency_data[1]}\n")
     print(f"exceptions: {latency_data[2]}\n")
 
@@ -85,10 +91,10 @@ async def warmup_requests(connections,client):
 
 async def run_latency_test(tests):
     limits = httpx.Limits(
-        max_connections = 1000,
+        max_connections = 1500,
     )
-    async with httpx.AsyncClient(limits = limits) as client:
-        await warmup_requests(5,client)
+    async with httpx.AsyncClient(limits = limits, timeout = httpx.Timeout(5.0, read =30.0)) as client:
+        await warmup_requests(40,client)
         for num_connections in tests:
             await test_latency(num_connections,client)
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ import asyncio
 import struct
 import uuid
 from contextlib import asynccontextmanager
+import traceback
 
 
 print("model loaded")
@@ -30,24 +31,31 @@ async def add_to_queue(job_id, image_bytes):
 
 async def response_reader():
     while True:
-        _, response = await r_reader.blpop("response")
+        payload = await r_reader.blpop("response", timeout = 1)
+        if payload is None:
+            continue
+        _, response = payload
         id, val = struct.unpack("<16sq",response)
         try:  
             awake_coroutine(id, val)
         except Exception as e:
-            print(f"Exception in response reader{e.type} : {e}" )
+            print(f"Exception in response reader{type(e)} : {e}" )
 
 async def store_coroutine(job_id, image_bytes):
-    future = asyncio.get_running_loop().create_future()
-    pending_jobs[job_id] = future
-    await add_to_queue(job_id, image_bytes)
-    return await future
+    try:
+        future = asyncio.get_running_loop().create_future()
+        pending_jobs[job_id] = future
+        await add_to_queue(job_id, image_bytes)
+        return await future
+    except Exception as e:
+        print(f"Exception in store_coroutine{type(e)}: {e}")
 
 def awake_coroutine(job_id, response):
     try:
         future = pending_jobs.pop(job_id)
         future.set_result(response)
     except Exception as e:
+
         print(f"Exption in awake_coroutine: {e}")
 """
 def test_resnet(resnet18, full_image):
@@ -68,11 +76,19 @@ async def concurrent(url, file, client):
     response = await store_coroutine(job_id)
     add_to_queue(job_id,file)
 """
+def on_done(task):
+    if task.cancelled():
+        print("Reader task cancelled successfully")
+    elif task.exception():
+        traceback.print_exception(task.exception())
+    else:
+        print(f"Reader is done: {task.result()}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await r.flushdb()
     reader = asyncio.create_task(response_reader())
+    reader.add_done_callback(on_done)
     yield
     reader.cancel()
     
