@@ -21,7 +21,7 @@ async def concurrent(url, file,client):
     response = await client.post(url,files = file)
     client_end = time.perf_counter()
     if response.status_code != 200:
-        return (client_start,client_end, response.status_code,-1)
+        return (client_start,client_end, response.status_code,-1,response.headers.get("server"), response.text)
     return (client_start,client_end, response.status_code,response.json()["Server_Rate"])
 
 async def test_latency(connections,client):
@@ -44,7 +44,7 @@ def calculate_latency(results, wall_time):
     4: Server time
     5: Wall Time
     """
-    failed = []
+    failed = {}
     exceptions = []
     client_time_data = []
     server_time_data = []
@@ -59,7 +59,10 @@ def calculate_latency(results, wall_time):
                 client_time_data.append(time_taken)
                 server_time_data.append(result[3])
             else:
-                failed.append(result)
+                if result[2] not in failed:
+                    failed[result[2]] = [1, result[4], result[5]]
+                else:
+                    failed[result[2]][0] += 1
     #print(f"data len: {len(data)}, num failed: {len(failed)}, num exceptions{len(exceptions)}")
     client_time_percentiles = {}
     server_time_percentiles = {}
