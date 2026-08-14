@@ -20,12 +20,27 @@ r = redis.Redis(host = 'localhost', port = 6379, db = 0)
 def pop_from_queue():
     while True:
         payload = r.blpop("jobs", timeout = 1)
+        wait_time = 0.2
         if payload is None:
             continue
-        job_id = payload[1]
-        image_bytes = r.get(job_id)
-        r.delete(job_id)
-        work(resnet18, image_bytes, job_id)
+        else:
+            start = time.perf_counter()
+            counter = 1
+            payloads = [payload]
+            while time.perf_counter() - start < wait_time and counter < 8:
+                job = r.lpop("jobs")
+                if job is None:
+                    continue
+                else:
+                    payloads.append(payload)
+                    counter += 1
+            batch = []
+        for payload in payloads:
+            job_id = payload[1]
+            image_bytes = r.get(job_id)
+            r.delete(job_id)
+            batch.append((job_id,image_bytes))
+        work(resnet18, batch)
         
 
 def push_response_to_queue(id, val):
@@ -33,11 +48,14 @@ def push_response_to_queue(id, val):
     r.rpush("response", paylaod)
 
 #worker functions
-def work(model, image_bytes,job_id):
-    img = io.BytesIO(image_bytes)
-    img = Image.open(img).convert("RGB")
-    img_tensor = preprocess(img)
-    img_tensor = img_tensor.unsqueeze(0)
+def work(model, batch):
+    tensors = []
+    for job_id, image_bytes in batch:
+        img = io.BytesIO(image_bytes)
+        img = Image.open(img).convert("RGB")
+        img_tensor = preprocess(img)
+        img_tensor = img_tensor.unsqueeze(0)
+        tensors.append(img_tensor)
     #print(img_tensor.shape)
     with torch.no_grad():
         predictions = resnet18(img_tensor)
