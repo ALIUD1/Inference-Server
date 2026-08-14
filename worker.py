@@ -5,6 +5,7 @@ from PIL import Image
 import io
 import torch
 from torchvision import models
+import time
 
 print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
@@ -26,17 +27,16 @@ def pop_from_queue():
         else:
             start = time.perf_counter()
             counter = 1
-            payloads = [payload]
+            job_ids = [payload[1]]
             while time.perf_counter() - start < wait_time and counter < 8:
                 job = r.lpop("jobs")
                 if job is None:
                     continue
                 else:
-                    payloads.append(payload)
+                    job_ids.append(job)
                     counter += 1
             batch = []
-        for payload in payloads:
-            job_id = payload[1]
+        for job_id in job_ids:
             image_bytes = r.get(job_id)
             r.delete(job_id)
             batch.append((job_id,image_bytes))
@@ -50,18 +50,23 @@ def push_response_to_queue(id, val):
 #worker functions
 def work(model, batch):
     tensors = []
+    ids = []
     for job_id, image_bytes in batch:
         img = io.BytesIO(image_bytes)
         img = Image.open(img).convert("RGB")
         img_tensor = preprocess(img)
-        img_tensor = img_tensor.unsqueeze(0)
+        #img_tensor = img_tensor.unsqueeze(0) stack eliminates the need for it 
         tensors.append(img_tensor)
+        ids.append(job_id)
+    
+    full_tensor = torch.stack(tensors)
     #print(img_tensor.shape)
     with torch.no_grad():
-        predictions = resnet18(img_tensor)
-
-    predicted = predictions.argmax(dim=1).item()
-    push_response_to_queue(job_id, predicted)
+        predictions = model(full_tensor)
+    for i, job_id in enumerate(ids):
+        prediction = predictions[i]
+        predicted = prediction.argmax().item()
+        push_response_to_queue(job_id, predicted)
 
 
 if __name__ == "__main__":
