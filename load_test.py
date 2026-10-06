@@ -4,9 +4,9 @@ import asyncio
 import time
 import numpy as np
 import redis
-import worker
+import os
 
-r = redis.Redis(host='localhost', port=6379, db=0)
+r = redis.Redis(host='localhost', port=6379, db=0, password=os.environ["REDIS_PASSWORD"])
 
 # Flush current database
 r.flushdb()
@@ -103,6 +103,4 @@ async def run_latency_test(tests):
             await test_latency(num_connections,client)
 if __name__ == "__main__":
     for i in [0.01, 0.03, 0.05, 0.08, 0.1, 0.13, 0.15, 0.17, 0.2]:
-        worker.BATCH_FILL_WAIT_TIME = i
-        print(f"Data from batch fill wait time at: {i}")
         asyncio.run(run_latency_test([10,100,200,300,500,700, 900, 1000,1200]))

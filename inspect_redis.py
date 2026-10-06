@@ -1,6 +1,7 @@
 import redis
+import os
 
-r = redis.Redis(host='localhost', port=6379, db=0)
+r = redis.Redis(host='localhost', port=6379, db=0, password=os.environ["REDIS_PASSWORD"])
 
 print("jobs      :", r.llen("jobs"))
 print("response  :", r.llen("response"))

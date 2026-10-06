@@ -11,6 +11,8 @@ import struct
 import uuid
 from contextlib import asynccontextmanager
 import traceback
+import os
+import argparse 
 
 
 print("model loaded")
@@ -22,8 +24,8 @@ resnet18.eval()
 pending_jobs = {} 
 
 #redis functions 
-r = Redis(host = 'localhost', port = 6379, db = 0, max_connections = 1000)
-r_reader = Redis(host = 'localhost', port = 6379, db = 0)
+r = Redis(host = 'localhost', port = 6379, db = 0, max_connections = 1000, password = os.environ["REDIS_PASSWORD"])
+r_reader = Redis(host = 'localhost', port = 6379, db = 0, password = os.environ["REDIS_PASSWORD"])
 
 async def add_to_queue(job_id, image_bytes):
     await r.set(job_id, image_bytes)

@@ -7,6 +7,7 @@ import torch
 from torchvision import models
 import time
 import logging
+import os
 
 BATCH_FILL_WAIT_TIME = 0.2
 BATCH_SIZE = 8
@@ -22,7 +23,7 @@ print(f"wait = {BATCH_FILL_WAIT_TIME}")
 print(f"batch size = {BATCH_SIZE}")
 #redis functions
 
-r = redis.Redis(host = 'localhost', port = 6379, db = 0)
+r = redis.Redis(host = 'localhost', port = 6379, db = 0, password = os.environ["REDIS_PASSWORD"])
 
 def pop_from_queue():
     while True:
