@@ -8,23 +8,30 @@ from torchvision import models
 import time
 import logging
 import os
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--redis-host", default = "127.0.0.1")
+parser.add_argument("--redis-port", type = int, default = 6379)
+parser.add_argument("--threads", "-t", type = int, default = 1)
+args = parser.parse_args()
 BATCH_FILL_WAIT_TIME = 0.2
 BATCH_SIZE = 8
+
 
 print("model loaded")
 #loading resnet18 and setting it from training to evaluation mode
 resnet18 = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
 preprocess = models.ResNet18_Weights.DEFAULT.transforms()
 resnet18.eval()
-torch.set_num_threads(1)
+torch.set_num_threads(args.threads)
 print(torch.get_num_threads())
 print(f"wait = {BATCH_FILL_WAIT_TIME}")
 print(f"batch size = {BATCH_SIZE}")
 #redis functions
 
-r = redis.Redis(host = 'localhost', port = 6379, db = 0, password = os.environ["REDIS_PASSWORD"])
-
+r = redis.Redis(host = args.redis_host, port = args.redis_port, db = 0, password = os.environ["REDIS_PASSWORD"])
+print("Connected to redis\n")
 def pop_from_queue():
     while True:
         payload = r.blpop("jobs", timeout = 1)
