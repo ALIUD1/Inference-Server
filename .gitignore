@@ -3,3 +3,10 @@ __pycache__/
 *.pyc
 uploads/
 .vscode/
+*.log
+dump.rdb
+notes
+.DS_Store
+CLAUDE.md
+.claude/
+HANDOFF*.md
