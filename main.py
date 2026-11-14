@@ -114,7 +114,7 @@ async def predict_img(file: UploadFile):
 if __name__ == "__main__":
     #test_resnet(resnet18)
     print("hello world")
-    test_batching(resnet18,"pgiff.webp")
+    #test_batching(resnet18,"pgiff.webp")
 
 
 """
